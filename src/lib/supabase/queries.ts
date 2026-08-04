@@ -44,38 +44,47 @@ export async function fetchChapters(bookId: string): Promise<Chapter[]> {
   return (data as Chapter[]) || [];
 }
 
-/** 轻量获取卷列表（不含章节详情，用于目录页快速加载） */
-export async function fetchVolumesLight(bookId: string): Promise<(Volume & { chapter_count: number })[]> {
+/** 获取卷列表 + 所有章节（两次并行查询，返回分组后的数据） */
+export async function fetchVolumesWithAllChapters(bookId: string): Promise<{
+  volumes: Volume[];
+  chaptersMap: Map<string, Chapter[]>;
+}> {
   const supabase = supabaseServer();
   
-  // 只获取卷信息和章节数量，不获取章节详情
-  const { data: volumes, error: volError } = await supabase
-    .from("volumes")
-    .select("*")
-    .eq("book_id", bookId)
-    .order("order", { ascending: true });
+  // 并行获取卷列表和所有章节
+  const [{ data: volumes, error: volError }, { data: chapters, error: chError }] = await Promise.all([
+    supabase
+      .from("volumes")
+      .select("*")
+      .eq("book_id", bookId)
+      .order("order", { ascending: true }),
+    supabase
+      .from("chapters")
+      .select("id, title, order, word_count, volume_id")
+      .eq("book_id", bookId)
+      .order("order", { ascending: true }),
+  ]);
+  
   if (volError) throw volError;
-
-  // 统计每个卷的章节数
-  const { data: chapters, error: chError } = await supabase
-    .from("chapters")
-    .select("volume_id")
-    .eq("book_id", bookId);
   if (chError) throw chError;
 
-  const countMap = new Map<string, number>();
-  for (const ch of chapters || []) {
+  // 按 volume_id 分组
+  const chaptersMap = new Map<string, Chapter[]>();
+  for (const ch of (chapters as Chapter[]) || []) {
     const vid = ch.volume_id || "";
-    countMap.set(vid, (countMap.get(vid) || 0) + 1);
+    if (!chaptersMap.has(vid)) {
+      chaptersMap.set(vid, []);
+    }
+    chaptersMap.get(vid)!.push(ch);
   }
 
-  return (volumes || []).map((v) => ({
-    ...v,
-    chapter_count: countMap.get(v.id) || 0,
-  }));
+  return {
+    volumes: (volumes || []) as Volume[],
+    chaptersMap,
+  };
 }
 
-/** 获取某卷下的章节列表（用于展开卷时懒加载） */
+/** 获取某卷下的章节列表 */
 export async function fetchVolumeChapters(volumeId: string): Promise<Chapter[]> {
   const supabase = supabaseServer();
   const { data, error } = await supabase
@@ -122,7 +131,6 @@ export async function fetchVolumeWithChapters(bookId: string): Promise<VolumeWit
     }
   }
 
-  // 确保每卷内的章节按 order 排序
   return volumes.map((v) => {
     const vol = volumeMap.get(v.id)!;
     vol.chapters.sort((a, b) => a.order - b.order);
@@ -137,22 +145,21 @@ export async function fetchChapterWithSection(
 
   const { data: chapterData, error: chapterError } = await supabase
     .from("chapters")
-    .select("*")
+    .select("id, title, order, word_count, volume_id, book_id, created_at")
     .eq("id", chapterId)
     .single();
   if (chapterError) throw chapterError;
   if (!chapterData) return null;
 
-  // 直接查询 sections 表，避免关联查询在重命名后失效
   const { data: sectionData, error: sectionError } = await supabase
     .from("sections")
-    .select("*")
+    .select("id, chapter_id, content")
     .eq("chapter_id", chapterId)
     .maybeSingle();
   if (sectionError) throw sectionError;
 
   return {
     chapter: chapterData as Chapter,
-    section: (sectionData as Section) || null,
+    section: (sectionData as unknown as Section) || null,
   };
 }

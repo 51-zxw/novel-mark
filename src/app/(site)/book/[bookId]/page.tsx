@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
-import { fetchBook, fetchVolumesLight } from "@/lib/supabase/queries";
+import { fetchBook, fetchVolumes } from "@/lib/supabase/queries";
 import { VolumeSection } from "@/components/site/VolumeSection";
 import { BookPageClient } from "@/components/site/BookPageClient";
+
+export const revalidate = 3600;
 
 export default async function BookPage({
   params,
@@ -10,14 +12,13 @@ export default async function BookPage({
 }) {
   const { bookId } = await params;
 
+  // 只获取书籍信息 + 卷列表（章节按需懒加载）
   const [book, volumes] = await Promise.all([
     fetchBook(bookId),
-    fetchVolumesLight(bookId),
+    fetchVolumes(bookId),
   ]);
 
   if (!book) notFound();
-
-  const totalChapters = volumes.reduce((sum, v) => sum + v.chapter_count, 0);
 
   return (
     <BookPageClient>
@@ -29,7 +30,7 @@ export default async function BookPage({
           <span className="text-[var(--fg-muted)]">》</span>
         </h1>
         <div className="text-sm text-[var(--fg-muted)]">
-          {book.author} · 共 {totalChapters} 章
+          {book.author} · 共 {volumes.length} 卷
           {book.total_word_count ? ` · ${book.total_word_count.toLocaleString()} 字` : ""}
         </div>
         {/* 装饰线 */}
@@ -40,7 +41,7 @@ export default async function BookPage({
         </div>
       </div>
 
-      {/* 按卷分组的目录（轻量级，章节懒加载） */}
+      {/* 按卷分组的目录 - 章节懒加载 */}
       <div>
         <div className="divide-y divide-[var(--border)]">
           {volumes.map((volume, index) => (
@@ -50,7 +51,7 @@ export default async function BookPage({
               volumeId={volume.id}
               volumeTitle={volume.title}
               volumeNumber={index + 1}
-              chapterCount={volume.chapter_count}
+              chapters={[]}
               defaultOpen={index === 0}
             />
           ))}
@@ -58,12 +59,4 @@ export default async function BookPage({
       </div>
     </BookPageClient>
   );
-}
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ bookId: string }>;
-}) {
-  return {};
 }

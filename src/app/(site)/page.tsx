@@ -1,6 +1,9 @@
 import { fetchBooks } from "@/lib/supabase/queries";
 import { BookCard } from "@/components/site/BookCard";
 
+// ISR: 缓存书架页 1 小时
+export const revalidate = 3600;
+
 export default async function HomePage() {
   const books = await fetchBooks();
 

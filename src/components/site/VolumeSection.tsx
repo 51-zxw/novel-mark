@@ -8,27 +8,27 @@ export function VolumeSection({
   volumeId,
   volumeTitle,
   volumeNumber,
-  chapterCount,
+  chapters: initialChapters,
   defaultOpen = false,
 }: {
   bookId: string;
   volumeId: string;
   volumeTitle: string;
   volumeNumber: number;
-  chapterCount: number;
+  chapters: ChapterLite[];
   defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [chapters, setChapters] = useState<ChapterLite[]>([]);
+  const [chapters, setChapters] = useState<ChapterLite[]>(initialChapters);
   const [loading, setLoading] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(initialChapters.length > 0);
 
-  // 初始默认展开时也需要加载
+  // 展开时懒加载章节
   useEffect(() => {
-    if (open && !loaded) {
+    if (open && !loaded && !loading) {
       loadChapters();
     }
-  }, [open]);
+  }, [open, loaded, loading]);
 
   const loadChapters = async () => {
     setLoading(true);
@@ -53,10 +53,12 @@ export function VolumeSection({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 py-2 text-left hover:bg-[var(--bg-soft)] -mx-4 px-4 rounded transition-colors"
       >
-        <span className="font-serif text-base font-medium flex-shrink-0">第{volumeNumber}卷 · {volumeTitle}</span>
+        <span className="font-serif text-base font-medium flex-shrink-0">
+          第{volumeNumber}卷 · {volumeTitle}
+        </span>
         <div className="flex-1 border-b border-dashed border-[var(--border)] translate-y-[-2px]"></div>
         <div className="flex items-center gap-2 text-xs text-[var(--fg-muted)] flex-shrink-0">
-          <span>{chapterCount} 章</span>
+          <span>{chapters.length > 0 ? `${chapters.length} 章` : loading ? "加载中..." : ""}</span>
           <svg
             className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
             viewBox="0 0 20 20"
@@ -72,16 +74,23 @@ export function VolumeSection({
       </button>
       {open && (
         <div className="pb-2">
-          {loading ? (
-            <div className="py-4 text-center text-sm text-[var(--fg-muted)]">加载中...</div>
-          ) : (
-            chapters.map((chapter) => (
-              <ChapterItem
-                key={chapter.id}
-                bookId={bookId}
-                chapter={chapter}
-              />
-            ))
+          {loading && (
+            <div className="flex justify-center py-4">
+              <svg className="h-4 w-4 animate-spin text-[var(--accent)]" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            </div>
+          )}
+          {!loading && chapters.map((chapter) => (
+            <ChapterItem
+              key={chapter.id}
+              bookId={bookId}
+              chapter={chapter}
+            />
+          ))}
+          {!loading && chapters.length === 0 && (
+            <div className="text-xs text-[var(--fg-muted)] py-2 px-4">暂无章节</div>
           )}
         </div>
       )}

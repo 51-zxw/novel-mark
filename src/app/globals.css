@@ -43,18 +43,12 @@ body {
   text-indent: 2em;
 }
 
-/* 阅读页正文排版 */
+/* 阅读页正文排版 - 字号可通过主题调节 */
 .reading-content p {
   text-indent: 2em;
   margin-bottom: 1em;
   line-height: 1.8;
-  font-size: 1.0625rem;
-}
-
-@media (min-width: 768px) {
-  .reading-content p {
-    font-size: 1rem;
-  }
+  font-size: var(--font-size-base, 16px);
 }
 
 /* 隐藏滚动条 */
@@ -84,4 +78,15 @@ body {
   -ms-overflow-style: thin;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+}
+
+/* 文本选中颜色 - 亮黄色 */
+::selection {
+  background-color: #f0b90b;
+  color: #000000;
+}
+
+::-moz-selection {
+  background-color: #f0b90b;
+  color: #000000;
 }
