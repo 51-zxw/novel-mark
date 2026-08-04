@@ -23,10 +23,11 @@ function getInitialTheme(): Theme {
 
 function applyTheme(theme: Theme) {
   const root = document.documentElement;
-  if (theme === "dark") {
-    root.classList.add("dark");
+  // 默认 :root 即 dark，仅在 light 时添加 .light 类
+  if (theme === "light") {
+    root.classList.add("light");
   } else {
-    root.classList.remove("dark");
+    root.classList.remove("light");
   }
 }
 

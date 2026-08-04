@@ -10,16 +10,25 @@ export type Book = {
   updated_at: string;
 };
 
+export type Volume = {
+  id: string;
+  book_id: string;
+  title: string;
+  order: number;
+  created_at: string;
+};
+
 export type Chapter = {
   id: string;
   book_id: string;
+  volume_id: string | null;
   order: number;
   title: string;
   word_count: number;
   created_at: string;
 };
 
-export type ChapterContent = {
+export type Section = {
   id: string;
   chapter_id: string;
   content: string;
@@ -41,4 +50,9 @@ export type ReadingProgress = {
   chapter_id: string;
   scroll_position: number;
   updated_at: string;
+};
+
+// 用于目录页的聚合数据
+export type VolumeWithChapters = Volume & {
+  chapters: Chapter[];
 };
