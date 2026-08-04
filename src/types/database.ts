@@ -1,0 +1,44 @@
+export type Book = {
+  id: string;
+  title: string;
+  author: string;
+  cover_url: string | null;
+  description: string | null;
+  total_word_count: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Chapter = {
+  id: string;
+  book_id: string;
+  order: number;
+  title: string;
+  word_count: number;
+  created_at: string;
+};
+
+export type ChapterContent = {
+  id: string;
+  chapter_id: string;
+  content: string;
+  updated_at: string;
+};
+
+export type AdminUser = {
+  id: string;
+  username: string;
+  password_hash: string;
+  last_login: string | null;
+  created_at: string;
+};
+
+export type ReadingProgress = {
+  id: string;
+  user_id: string;
+  book_id: string;
+  chapter_id: string;
+  scroll_position: number;
+  updated_at: string;
+};
