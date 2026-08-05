@@ -129,7 +129,7 @@ export function Reader({
 
       {/* 侧边栏 - 章节懒加载 */}
       <aside
-        className={`fixed left-0 top-0 z-50 h-full w-72 bg-[var(--bg-soft)] border-r border-[var(--border)] shadow-xl transition-transform duration-300 overflow-y-auto thin-scrollbar ${
+        className={`fixed left-0 top-0 z-50 h-full w-72 bg-[var(--bg-soft)] border-r border-[var(--border)] shadow-xl transition-transform duration-300 overflow-y-auto scrollbar-beautiful ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

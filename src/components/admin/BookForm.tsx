@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Book } from "@/types/database";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -21,6 +21,11 @@ export function BookForm({ book, submitAction }: Props) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    book?.cover_url ?? null
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,6 +44,44 @@ export function BookForm({ book, submitAction }: Props) {
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError("");
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const body = await res.json();
+      if (!res.ok) {
+        setError(body.error || "上传失败");
+        return;
+      }
+
+      setForm((f) => ({ ...f, cover_url: body.url }));
+      setPreviewUrl(body.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "上传失败");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleClearCover() {
+    setForm((f) => ({ ...f, cover_url: "" }));
+    setPreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   const inputBase =
@@ -69,14 +112,79 @@ export function BookForm({ book, submitAction }: Props) {
           className={inputBase}
         />
       </Field>
-      <Field label="封面 URL">
-        <input
-          type="text"
-          value={form.cover_url}
-          onChange={(e) => update("cover_url", e.target.value)}
-          placeholder="https://..."
-          className={inputBase}
-        />
+      <Field label="封面图片">
+        <div className="flex items-start gap-4">
+          {/* 预览区 */}
+          <div className="relative w-28 h-40 shrink-0 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--bg-soft)]">
+            {previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt="封面预览"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xs text-[var(--fg-muted)]">
+                无封面
+              </div>
+            )}
+            {uploading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
+                <LoadingSpinner size={24} />
+                <span className="mt-1 text-[10px] text-white">上传中...</span>
+              </div>
+            )}
+          </div>
+
+          {/* 操作区 */}
+          <div className="flex-1 space-y-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={handleFileSelect}
+              disabled={uploading}
+              className="hidden"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="rounded-md border border-[var(--border)] px-3 py-2 text-xs text-[var(--fg)] transition-all duration-150 hover:border-[var(--accent)]/50 hover:text-[var(--accent)] active:scale-[0.98] disabled:opacity-50 inline-flex items-center gap-1"
+              >
+                {uploading ? (
+                  <>
+                    <LoadingSpinner size={12} />
+                    <span>上传中...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📤</span>
+                    <span>{previewUrl ? "更换封面" : "上传封面"}</span>
+                  </>
+                )}
+              </button>
+              {previewUrl && !uploading && (
+                <button
+                  type="button"
+                  onClick={handleClearCover}
+                  className="rounded-md border border-red-500/30 px-3 py-2 text-xs text-red-500 transition-all duration-150 hover:border-red-500 hover:bg-red-500/10 active:scale-[0.98]"
+                >
+                  移除
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--fg-muted)]">
+              支持 JPG / PNG / WEBP / GIF，最大 5MB
+            </p>
+            {form.cover_url && (
+              <p className="text-[10px] text-[var(--fg-muted)]/70 truncate">
+                URL: {form.cover_url}
+              </p>
+            )}
+          </div>
+        </div>
       </Field>
       <Field label="简介">
         <textarea

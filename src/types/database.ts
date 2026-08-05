@@ -25,6 +25,7 @@ export type Chapter = {
   order: number;
   title: string;
   word_count: number;
+  proofread?: boolean;
   created_at: string;
 };
 
