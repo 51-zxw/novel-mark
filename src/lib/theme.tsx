@@ -19,10 +19,10 @@ const THEME_KEY = "novel-mark-theme";
 const FONT_SIZE_KEY = "novel-mark-font-size";
 
 const FONT_SIZE_MAP: Record<FontSize, string> = {
-  sm: "14px",
-  base: "16px",
-  lg: "18px",
-  xl: "20px",
+  sm: "18px",
+  base: "20px",
+  lg: "22px",
+  xl: "24px",
 };
 
 function getInitialTheme(): Theme {

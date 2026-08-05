@@ -13,7 +13,11 @@ type Props = {
   nextChapter: { id: string; title: string } | null;
   readingMinutes: number;
   volumes: VolumeWithChapters[];
+  currentChapterOrder?: number;
 };
+
+// 模块级缓存：bookId -> Map<volumeId, chapters[]>
+const volumeChaptersCache = new Map<string, Map<string, Chapter[]>>();
 
 export function Reader({
   bookId,
@@ -24,15 +28,23 @@ export function Reader({
   nextChapter,
   readingMinutes,
   volumes: initialVolumes,
+  currentChapterOrder,
 }: Props) {
   const [progress, setProgress] = useState(0);
   const [showTop, setShowTop] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeVolume, setActiveVolume] = useState<number>(-1);
   const [volumes, setVolumes] = useState<VolumeWithChapters[]>(initialVolumes);
-  const [sidebarLoaded, setSidebarLoaded] = useState(false);
-  const [loadingChapters, setLoadingChapters] = useState(false);
+  const [loadingVolumes, setLoadingVolumes] = useState<Set<string>>(new Set());
   const contentRef = useRef<HTMLDivElement>(null);
+  const volumesRef = useRef(initialVolumes);
+  const loadingVolumesRef = useRef(new Set<string>());
+  const activeVolumeRef = useRef(-1);
+
+  // 同步 ref
+  volumesRef.current = volumes;
+  loadingVolumesRef.current = loadingVolumes;
+  activeVolumeRef.current = activeVolume;
 
   // 初始化当前卷为展开状态
   useEffect(() => {
@@ -42,28 +54,88 @@ export function Reader({
     }
   }, [chapter.volume_id]);
 
-  // 侧边栏打开时懒加载所有卷的章节
-  useEffect(() => {
-    if (sidebarOpen && !sidebarLoaded) {
-      loadSidebarData();
+  // 获取单卷章节（带缓存）
+  const loadVolumeChapters = useCallback(async (volumeId: string) => {
+    // 检查缓存
+    let bookCache = volumeChaptersCache.get(bookId);
+    if (!bookCache) {
+      bookCache = new Map();
+      volumeChaptersCache.set(bookId, bookCache);
     }
-  }, [sidebarOpen, sidebarLoaded]);
 
-  const loadSidebarData = async () => {
-    setLoadingChapters(true);
+    if (bookCache.has(volumeId)) {
+      const cached = bookCache.get(volumeId)!;
+      setVolumes((prev) =>
+        prev.map((v) =>
+          v.id === volumeId ? { ...v, chapters: cached as any } : v
+        )
+      );
+      return;
+    }
+
+    // 预取第一卷时可能已包含数据
+    const existing = volumesRef.current.find((v) => v.id === volumeId);
+    if (existing && existing.chapters.length > 0) {
+      bookCache.set(volumeId, existing.chapters as any);
+      return;
+    }
+
+    setLoadingVolumes((prev) => {
+      const next = new Set(prev);
+      next.add(volumeId);
+      return next;
+    });
     try {
-      const res = await fetch(`/api/books/${bookId}/volumes`);
+      const res = await fetch(`/api/books/${bookId}/volumes/${volumeId}`);
       if (res.ok) {
         const data = await res.json();
-        setVolumes(data.volumes);
-        setSidebarLoaded(true);
+        const chapters = data.chapters || [];
+        bookCache.set(volumeId, chapters);
+        setVolumes((prev) =>
+          prev.map((v) =>
+            v.id === volumeId ? { ...v, chapters: chapters as any } : v
+          )
+        );
       }
     } catch (err) {
-      console.error("加载目录失败:", err);
+      console.error("加载卷章节失败:", err);
     } finally {
-      setLoadingChapters(false);
+      setLoadingVolumes((prev) => {
+        const next = new Set(prev);
+        next.delete(volumeId);
+        return next;
+      });
     }
-  };
+  }, [bookId]);
+
+  // 展开卷时懒加载
+  const toggleVolume = useCallback((idx: number) => {
+    const vol = volumesRef.current[idx];
+    if (!vol) return;
+
+    if (activeVolume === idx) {
+      setActiveVolume(-1);
+      return;
+    }
+
+    // 如果该卷没有章节数据，懒加载
+    if (vol.chapters.length === 0 && !loadingVolumesRef.current.has(vol.id)) {
+      loadVolumeChapters(vol.id);
+    }
+    setActiveVolume(idx);
+  }, [activeVolume, loadVolumeChapters]);
+
+  // 侧边栏打开时，为缺少数据的卷预加载
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const volsToLoad = volumesRef.current.filter(
+      (v) => v.chapters.length === 0 && !loadingVolumesRef.current.has(v.id)
+    );
+    if (volsToLoad.length === 0) return;
+
+    // 并行加载所有缺数据的卷
+    Promise.all(volsToLoad.map((v) => loadVolumeChapters(v.id)));
+  }, [sidebarOpen, loadVolumeChapters]);
 
   // 进度计算
   useEffect(() => {
@@ -93,18 +165,15 @@ export function Reader({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const toggleVolume = (idx: number) => {
-    if (activeVolume === idx) {
-      setActiveVolume(-1);
-    } else {
-      setActiveVolume(idx);
-    }
-  };
-
   const paragraphs = content
     .split(/\n+/)
     .map((p) => p.trim())
     .filter(Boolean);
+
+  // 构建标题：带第x节
+  const chapterTitle = currentChapterOrder
+    ? `第${currentChapterOrder}节 ${chapter.title}`
+    : chapter.title;
 
   return (
     <>
@@ -127,7 +196,7 @@ export function Reader({
         />
       )}
 
-      {/* 侧边栏 - 章节懒加载 */}
+      {/* 侧边栏 - 章节懒加载（带缓存） */}
       <aside
         className={`fixed left-0 top-0 z-50 h-full w-72 bg-[var(--bg-soft)] border-r border-[var(--border)] shadow-xl transition-transform duration-300 overflow-y-auto scrollbar-beautiful ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -147,17 +216,10 @@ export function Reader({
           </button>
         </div>
         <div className="py-2">
-          {loadingChapters && (
-            <div className="flex justify-center py-8">
-              <svg className="h-5 w-5 animate-spin text-[var(--accent)]" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-            </div>
-          )}
-          {!loadingChapters && volumes.map((vol, vi) => {
+          {volumes.map((vol, vi) => {
             const volChapters = vol.chapters || [];
-            
+            const isLoading = loadingVolumes.has(vol.id);
+
             return (
               <div key={vol.id || vi} className="mb-1">
                 <button
@@ -178,11 +240,22 @@ export function Reader({
                   </svg>
                   <span>{vol.title}</span>
                   <span className="ml-auto text-xs text-[var(--fg-muted)]">
-                    {volChapters.length > 0 ? `${volChapters.length}章` : ""}
+                    {isLoading ? (
+                      <svg className="h-3 w-3 animate-spin text-[var(--accent)]" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : volChapters.length > 0 ? `${volChapters.length}章` : ""}
                   </span>
                 </button>
-                {activeVolume === vi && volChapters.length > 0 && (
+                {activeVolume === vi && (
                   <div className="pb-1">
+                    {isLoading && (
+                      <div className="px-8 py-3 text-xs text-[var(--fg-muted)]">加载中...</div>
+                    )}
+                    {!isLoading && volChapters.length === 0 && (
+                      <div className="px-8 py-3 text-xs text-[var(--fg-muted)]">本卷暂无章节</div>
+                    )}
                     {volChapters.map((ch) => {
                       const isCurrent = ch.id === chapter.id;
                       return (
@@ -208,18 +281,15 @@ export function Reader({
               </div>
             );
           })}
-          {!loadingChapters && !sidebarLoaded && (
-            <div className="text-center text-xs text-[var(--fg-muted)] py-4">点击加载目录</div>
-          )}
         </div>
       </aside>
 
-      {/* 右下角悬浮按钮 */}
-      <div className="fixed right-4 bottom-6 z-30 flex flex-col gap-2">
+      {/* 右下角悬浮按钮 - 位于翻页导航上方，不遮挡 */}
+      <div className="fixed right-4 bottom-[105px] z-30 flex flex-col gap-2">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--fg-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--fg-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors shadow-md"
           aria-label="目录"
           title="目录"
         >
@@ -230,7 +300,7 @@ export function Reader({
         <button
           type="button"
           onClick={scrollToTop}
-          className={`flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--fg-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-all ${
+          className={`flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--fg-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-all shadow-md ${
             showTop ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           aria-label="回到顶部"
@@ -253,9 +323,11 @@ export function Reader({
           <span>{bookTitle}</span>
         </div>
 
-        {/* 章节标题 + 装饰线 */}
+        {/* 章节标题 + 装饰线（带第x节） */}
         <header className="mb-10">
-          <h1 className="font-serif text-2xl mb-4">{chapter.title}</h1>
+          <h1 className="font-serif text-2xl mb-4">
+            {chapterTitle}
+          </h1>
           <div className="flex items-center gap-3 mb-4">
             <span className="h-[2px] w-8 rounded-full bg-[var(--accent)]" />
             <div className="flex-1 h-px bg-[var(--border)]" />
@@ -279,8 +351,8 @@ export function Reader({
           )}
         </div>
 
-        {/* 翻页 */}
-        <nav className="mt-12 flex items-center justify-between border-t border-[var(--border)] pt-8 pb-16">
+        {/* 翻页 - 底部留更多空间避免悬浮按钮遮挡 */}
+        <nav className="mt-12 flex items-center justify-between border-t border-[var(--border)] pt-8 pb-4">
           {prevChapter ? (
             <Link
               href={`/book/${bookId}/${prevChapter.id}`}

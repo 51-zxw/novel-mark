@@ -7,6 +7,7 @@ import {
 } from "@/lib/supabase/queries";
 import { Reader } from "@/components/site/Reader";
 import { readingMinutes } from "@/lib/utils";
+import type { Chapter, VolumeWithChapters } from "@/types/database";
 
 export const revalidate = 3600;
 
@@ -29,10 +30,16 @@ export default async function ChapterPage({
   const currentChapter = result.chapter;
   const currentVolumeId = currentChapter.volume_id;
 
-  // 只加载当前卷的章节（用于翻页导航），卷列表单独加载
-  const [volumes, currentVolumeChapters] = await Promise.all([
-    fetchVolumes(bookId),
+  // 获取卷列表
+  const volumes = await fetchVolumes(bookId);
+
+  // 查找第一卷（用于首屏预加载章节）
+  const firstVolume = volumes.length > 0 ? volumes[0] : null;
+
+  // 并行获取：当前卷章节（翻页导航） + 第一卷章节（侧边栏预加载）
+  const [currentVolumeChapters, firstVolumeChapters] = await Promise.all([
     currentVolumeId ? fetchVolumeChapters(currentVolumeId) : Promise.resolve([]),
+    firstVolume ? fetchVolumeChapters(firstVolume.id) : Promise.resolve([]),
   ]);
 
   // 在当前卷内查找前后章节
@@ -46,14 +53,13 @@ export default async function ChapterPage({
       ? currentVolumeChapters[volumeIndex + 1]
       : null;
 
-  // 侧边栏：只传卷列表（不带章节），章节在用户打开侧边栏时懒加载
-  const volumeList = volumes.map((v) => ({
-    id: v.id,
-    book_id: v.book_id,
-    title: v.title,
-    order: v.order,
-    created_at: v.created_at,
-    chapters: [],
+  // 构建初始卷列表：第一卷带章节数据，其余卷不带（懒加载）
+  const volumeList: VolumeWithChapters[] = volumes.map((v) => ({
+    ...v,
+    chapters:
+      firstVolume && v.id === firstVolume.id
+        ? (firstVolumeChapters as Chapter[])
+        : [],
   }));
 
   const content = result.section?.content ?? "";
@@ -68,6 +74,7 @@ export default async function ChapterPage({
       nextChapter={nextChapter}
       readingMinutes={readingMinutes(result.chapter.word_count)}
       volumes={volumeList}
+      currentChapterOrder={currentChapter.order}
     />
   );
 }
