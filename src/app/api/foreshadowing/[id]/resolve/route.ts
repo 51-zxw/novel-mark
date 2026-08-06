@@ -4,7 +4,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ bookId: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const admin = await getCurrentAdmin();
@@ -15,13 +15,13 @@ export async function GET(
       );
 
     const supabase = supabaseServer();
-    const { bookId } = await params;
+    const { id } = await params;
 
     // 1. 查找「伏笔」标签
     const { data: foreLabels, error: labelError } = await supabase
       .from("labels")
       .select("id")
-      .eq("book_id", bookId)
+      .eq("book_id", id)
       .eq("admin_id", admin.id)
       .ilike("name", "%伏笔%");
     if (labelError) throw labelError;
@@ -47,7 +47,7 @@ export async function GET(
       .from("annotations")
       .select(`*, chapter:chapters(order, title)`)
       .in("id", foreAnnotationIds)
-      .eq("book_id", bookId)
+      .eq("book_id", id)
       .eq("admin_id", admin.id)
       .order("created_at", { ascending: true });
 
@@ -57,7 +57,7 @@ export async function GET(
       .select(
         `*, planted_annotation:annotations!foreshadowing_planted_annotation_id_fkey(*), resolutions:foreshadowing_resolutions(*, resolved_annotation:annotations(*))`,
       )
-      .eq("book_id", bookId)
+      .eq("book_id", id)
       .eq("admin_id", admin.id)
       .order("created_at", { ascending: true });
 
