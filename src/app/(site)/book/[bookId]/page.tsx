@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers"; // ← 新增
 import { fetchBook, fetchVolumes } from "@/lib/supabase/queries";
 import { VolumeSection } from "@/components/site/VolumeSection";
 import { BookPageClient } from "@/components/site/BookPageClient";
@@ -12,7 +13,10 @@ export default async function BookPage({
 }) {
   const { bookId } = await params;
 
-  // 只获取书籍信息 + 卷列表（章节按需懒加载）
+  // ← 新增：检查管理员登录状态
+  const cookieStore = await cookies();
+  const isLoggedIn = !!cookieStore.get("admin_token")?.value;
+
   const [book, volumes] = await Promise.all([
     fetchBook(bookId),
     fetchVolumes(bookId),
@@ -21,7 +25,8 @@ export default async function BookPage({
   if (!book) notFound();
 
   return (
-    <BookPageClient>
+    // ← 修改：传 bookId 和 isLoggedIn
+    <BookPageClient bookId={book.id} isLoggedIn={isLoggedIn}>
       {/* 书籍信息 - 居中 */}
       <div className="mb-10 text-center">
         <h1 className="font-serif text-3xl mb-3">
@@ -31,7 +36,9 @@ export default async function BookPage({
         </h1>
         <div className="text-sm text-[var(--fg-muted)]">
           {book.author} · 共 {volumes.length} 卷
-          {book.total_word_count ? ` · ${book.total_word_count.toLocaleString()} 字` : ""}
+          {book.total_word_count
+            ? ` · ${book.total_word_count.toLocaleString()} 字`
+            : ""}
         </div>
         {/* 装饰线 */}
         <div className="mt-5 flex items-center justify-center">

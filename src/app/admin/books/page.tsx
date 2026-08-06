@@ -49,12 +49,22 @@ export default async function AdminBooksPage() {
                 className="border-t border-[var(--border)] transition-colors hover:bg-[var(--bg-soft)]/60"
               >
                 <td className="px-4 py-3 font-medium">{book.title}</td>
-                <td className="px-4 py-3 text-[var(--fg-muted)]">{book.author}</td>
+                <td className="px-4 py-3 text-[var(--fg-muted)]">
+                  {book.author}
+                </td>
                 <td className="px-4 py-3 text-[var(--fg-muted)] tabular-nums">
                   {book.total_word_count.toLocaleString()}
                 </td>
-                <td className="px-4 py-3 text-[var(--fg-muted)]">{book.status}</td>
+                <td className="px-4 py-3 text-[var(--fg-muted)]">
+                  {book.status}
+                </td>
                 <td className="px-4 py-3 text-right space-x-1">
+                  <Link
+                    href={`/admin/books/${book.id}/labels`}
+                    className="inline-flex items-center rounded-md px-2 py-1 text-[var(--accent)] transition-all duration-150 hover:bg-[var(--accent)]/10 active:scale-95"
+                  >
+                    标签
+                  </Link>
                   <Link
                     href={`/admin/books/${book.id}/edit`}
                     className="inline-flex items-center rounded-md px-2 py-1 text-[var(--accent)] transition-all duration-150 hover:bg-[var(--accent)]/10 active:scale-95"

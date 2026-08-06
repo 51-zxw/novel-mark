@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
-export function BookPageClient({
-  children,
-}: {
+type Props = {
+  bookId: string;
+  isLoggedIn: boolean;
   children: React.ReactNode;
-}) {
+};
+
+export function BookPageClient({ bookId, isLoggedIn, children }: Props) {
   const [showTop, setShowTop] = useState(false);
 
   useEffect(() => {
@@ -22,8 +25,27 @@ export function BookPageClient({
   };
 
   return (
-    <>
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      {/* 仅登录后显示标注入口 */}
+      {isLoggedIn && (
+        <div className="flex justify-end gap-3 mb-6">
+          <Link
+            href={`/book/${bookId}/notes`}
+            className="px-4 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+          >
+            标注总览
+          </Link>
+          <Link
+            href={`/book/${bookId}/graph`}
+            className="px-4 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+          >
+            关系图谱
+          </Link>
+        </div>
+      )}
+
       {children}
+
       {/* 回到顶部按钮 */}
       <button
         type="button"
@@ -34,10 +56,20 @@ export function BookPageClient({
         aria-label="回到顶部"
         title="回到顶部"
       >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M5 15l7-7 7 7"
+          />
         </svg>
       </button>
-    </>
+    </div>
   );
 }

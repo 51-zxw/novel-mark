@@ -55,7 +55,9 @@ body {
   background: var(--bg);
   font-family: var(--font-sans, system-ui, sans-serif);
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 /* 正文首行缩进 */
@@ -65,7 +67,7 @@ body {
 
 /* 阅读页正文排版 - 字号可通过主题调节 */
 .reading-content p {
-  text-indent: 2em;
+  text-indent: 0.5em;
   margin-bottom: 1em;
   line-height: 1.8;
   font-size: var(--font-size-base, 20px);

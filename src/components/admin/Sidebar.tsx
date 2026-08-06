@@ -63,7 +63,7 @@ export function Sidebar({ username: _username }: { username: string }) {
               : pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link
-              key={item.href}
+              key={item.label}
               href={item.href}
               title={item.label}
               className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-all duration-150 ${
@@ -80,7 +80,9 @@ export function Sidebar({ username: _username }: { username: string }) {
           );
         })}
       </nav>
-      <div className={`p-2 border-t border-[var(--border)] ${collapsed ? "flex justify-center" : ""}`}>
+      <div
+        className={`p-2 border-t border-[var(--border)] ${collapsed ? "flex justify-center" : ""}`}
+      >
         <LogoutButton collapsed={collapsed} />
       </div>
     </aside>

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers"; // ← 新增
 import {
   fetchBook,
   fetchChapterWithSection,
@@ -17,6 +18,9 @@ export default async function ChapterPage({
   params: Promise<{ bookId: string; chapterId: string }>;
 }) {
   const { bookId, chapterId } = await params;
+  // 检查管理员登录状态（二期标注功能）
+  const cookieStore = await cookies();
+  const isLoggedIn = !!cookieStore.get("admin_token")?.value;
 
   // 获取书籍信息 + 当前章节内容
   const [book, result] = await Promise.all([
@@ -38,13 +42,15 @@ export default async function ChapterPage({
 
   // 并行获取：当前卷章节（翻页导航） + 第一卷章节（侧边栏预加载）
   const [currentVolumeChapters, firstVolumeChapters] = await Promise.all([
-    currentVolumeId ? fetchVolumeChapters(currentVolumeId) : Promise.resolve([]),
+    currentVolumeId
+      ? fetchVolumeChapters(currentVolumeId)
+      : Promise.resolve([]),
     firstVolume ? fetchVolumeChapters(firstVolume.id) : Promise.resolve([]),
   ]);
 
   // 在当前卷内查找前后章节
   const volumeIndex = currentVolumeChapters.findIndex(
-    (c) => c.id === chapterId
+    (c) => c.id === chapterId,
   );
   const prevChapter =
     volumeIndex > 0 ? currentVolumeChapters[volumeIndex - 1] : null;
@@ -75,6 +81,7 @@ export default async function ChapterPage({
       readingMinutes={readingMinutes(result.chapter.word_count)}
       volumes={volumeList}
       currentChapterOrder={currentChapter.order}
+      isLoggedIn={isLoggedIn} // ← 新增
     />
   );
 }
