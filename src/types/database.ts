@@ -115,6 +115,8 @@ export interface GraphNode {
   name: string;
   color: string;
   val: number;
+  chapter_id?: string; // ← 新增：角色首次出现的章节
+  start_offset?: number; // ← 新增：角色首次出现的偏移量
 }
 
 export interface GraphLink {

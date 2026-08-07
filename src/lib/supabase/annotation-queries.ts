@@ -206,7 +206,7 @@ export async function getGraphData(bookId: string): Promise<GraphData> {
   const { data: annotations, error: annError } = await supabase
     .from("annotations")
     .select(
-      `id, chapter_id, selected_text, labels:annotation_labels!inner(label_id)`,
+      `id, chapter_id, start_offset, selected_text, labels:annotation_labels!inner(label_id)`,
     )
     .eq("book_id", bookId)
     .eq("admin_id", admin.id)
@@ -214,10 +214,24 @@ export async function getGraphData(bookId: string): Promise<GraphData> {
   if (annError) throw annError;
 
   const nodeMap = new Map<string, GraphNode>();
+  const firstSeen = new Map<
+    string,
+    { chapter_id: string; start_offset: number }
+  >();
   const chapterRoles = new Map<string, Set<string>>();
+
   for (const ann of annotations || []) {
     const roleName = ann.selected_text.trim();
     if (!roleName) continue;
+
+    // 记录首次出现位置（只记第一次）
+    if (!firstSeen.has(roleName)) {
+      firstSeen.set(roleName, {
+        chapter_id: ann.chapter_id,
+        start_offset: ann.start_offset ?? 0,
+      });
+    }
+
     if (!nodeMap.has(roleName)) {
       nodeMap.set(roleName, {
         id: roleName,
@@ -228,9 +242,19 @@ export async function getGraphData(bookId: string): Promise<GraphData> {
     } else {
       nodeMap.get(roleName)!.val += 1;
     }
+
     if (!chapterRoles.has(ann.chapter_id))
       chapterRoles.set(ann.chapter_id, new Set());
     chapterRoles.get(ann.chapter_id)!.add(roleName);
+  }
+
+  // 把首次出现位置写回 node
+  for (const [name, node] of nodeMap) {
+    const first = firstSeen.get(name);
+    if (first) {
+      node.chapter_id = first.chapter_id;
+      node.start_offset = first.start_offset;
+    }
   }
 
   const linkMap = new Map<string, GraphLink>();

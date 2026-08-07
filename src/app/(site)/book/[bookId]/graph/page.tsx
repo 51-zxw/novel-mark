@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import type {
   GraphData,
   TimelineItem,
   Foreshadowing,
-  AnnotationWithLabels,
   CharacterRelation,
 } from "@/types/database";
 import { useAnnotations } from "@/hooks/useAnnotations";
@@ -22,11 +21,13 @@ const RELATION_TYPES = [
   "师徒",
   "夫妻",
   "兄弟",
+  "下属",
   "其他",
 ];
 
 export default function GraphPage() {
   const params = useParams();
+  const router = useRouter(); // ← 加上这个
   const bookId = params.bookId as string;
   const [activeTab, setActiveTab] = useState<
     "graph" | "timeline" | "foreshadowing"
@@ -234,7 +235,16 @@ export default function GraphPage() {
               <div className="space-y-4">
                 <div className="bg-[var(--bg-soft)] rounded-xl border border-[var(--border)] p-4">
                   {graphData.nodes.length > 0 ? (
-                    <ForceGraph data={graphData} />
+                    <ForceGraph
+                      data={graphData}
+                      onNodeClick={(node) => {
+                        if (node.chapter_id) {
+                          router.push(
+                            `/book/${bookId}/${node.chapter_id}?offset=${node.start_offset ?? 0}`,
+                          );
+                        }
+                      }}
+                    />
                   ) : (
                     <div className="text-center py-16 text-[var(--fg-muted)]">
                       <p className="text-lg mb-2">暂无角色数据</p>
@@ -295,7 +305,9 @@ export default function GraphPage() {
                   items={timelineData}
                   onItemClick={(item) => {
                     if (item.chapter_id) {
-                      window.location.href = `/book/${bookId}/${item.chapter_id}?offset=${item.start_offset ?? 0}`;
+                      router.push(
+                        `/book/${bookId}/${item.chapter_id}?offset=${item.start_offset ?? 0}`,
+                      );
                     }
                   }}
                 />
@@ -339,7 +351,9 @@ export default function GraphPage() {
                               onClick={() => {
                                 const ann = fs.planted_annotation;
                                 if (ann?.chapter_id) {
-                                  window.location.href = `/book/${bookId}/${ann.chapter_id}?offset=${ann.start_offset || 0}`;
+                                  router.push(
+                                    `/book/${bookId}/${ann.chapter_id}?offset=${ann.start_offset || 0}`,
+                                  );
                                 }
                               }}
                             >
@@ -357,7 +371,9 @@ export default function GraphPage() {
                                     className="text-sm text-[var(--fg-muted)] cursor-pointer hover:text-[var(--accent)] transition-colors"
                                     onClick={() => {
                                       if (ann.chapter_id) {
-                                        window.location.href = `/book/${bookId}/${ann.chapter_id}?offset=${ann.start_offset || 0}`;
+                                        router.push(
+                                          `/book/${bookId}/${ann.chapter_id}?offset=${ann.start_offset || 0}`,
+                                        );
                                       }
                                     }}
                                   >

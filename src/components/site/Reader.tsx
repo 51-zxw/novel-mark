@@ -11,6 +11,7 @@ import { useLabels, useAnnotations } from "@/hooks/useAnnotations";
 import HighlightedText from "@/components/annotation/HighlightedText";
 import AnnotationBubble from "@/components/annotation/AnnotationBubble";
 import AnnotationSidebar from "@/components/annotation/AnnotationSidebar";
+import { useRouter } from "next/navigation";
 
 type Props = {
   bookId: string;
@@ -40,6 +41,7 @@ export function Reader({
   currentChapterOrder,
   isLoggedIn = false,
 }: Props) {
+  const router = useRouter(); // ← 加上这个
   // ==================== 一期状态 ====================
   const [progress, setProgress] = useState(0);
   const [showTop, setShowTop] = useState(false);
@@ -575,7 +577,7 @@ export function Reader({
             onUpdateAnnotation={updateAnnotation}
             onDeleteAnnotation={deleteAnnotation}
             onNavigate={(chapterId) => {
-              window.location.href = `/book/${bookId}/${chapterId}`;
+              router.push(`/book/${bookId}/${chapterId}`);
             }}
           />
         </aside>
